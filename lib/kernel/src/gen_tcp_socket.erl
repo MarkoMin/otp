@@ -74,6 +74,10 @@
 -define(header(Packet, Size),
         (Size):(Packet)/unit:8-integer-big-unsigned).
 
+%% Little endian length before data header for packets {2, little} | {4, little}
+-define(little_header(Packet, Size),
+        (Size):(Packet)/unit:8-integer-little-unsigned).
+
 -define(badarg_exit(Error),
         case begin Error end of
             {error, badarg} -> exit(badarg);
@@ -522,12 +526,15 @@ send(?MODULE_socket(Server, Socket), Data) ->
            send_timeout := SendTimeout} = Meta} ->
             if
                 Packet =:= 1;
-                Packet =:= 2;
-                Packet =:= 4 ->
+                Packet =:= 2; Packet =:= {2, little};
+                Packet =:= 4; Packet =:= {4, little} ->
                     Data2       = iolist_to_binary(Data),
                     Size        = byte_size(Data2),
 		    %% ?DBG([{packet, Packet}, {data_size, Size}]),
-                    Header      = <<?header(Packet, Size)>>,
+                    Header = case Packet of
+                                 {N, little} -> <<?little_header(N, Size)>>;
+                                 _ -> <<?header(Packet, Size)>>
+                             end,
                     Header_Data = [Header, Data2],
                     Result      = socket_sendv(Socket,
                                                Header_Data, SendTimeout),
@@ -1342,13 +1349,15 @@ nopush_or_cork() ->
     end.
 
 %% -type packet_option_value() ::
-%%         0 | 1 | 2 | 4 | raw | sunrm |  asn1 |
+%%         0 | 1 | 2 | {2, little} | 4 | {4, little} | raw | sunrm | asn1 |
 %%         cdr | fcgi | line | tpkt | http | httph | http_bin | httph_bin.
 
 -compile({inline, [is_packet_option_value/1]}).
 is_packet_option_value(Value) ->
     case Value of
         0 -> true; 1 -> true; 2 -> true; 4 -> true;
+        {2, little} -> true;
+        {4, little} -> true;
         raw -> true;
         sunrm -> true;
         asn1 -> true;
@@ -2539,7 +2548,9 @@ packet_header_length(PacketType) ->
         0       -> error(badarg, [PacketType]);
         1       -> 1;
         2       -> 2;
+        {2, little} -> 2;
         4       -> 4;
+        {4, little} -> 4;
         cdr     -> 12;
         sunrm   -> 4;
         fcgi    -> 8;

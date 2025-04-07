@@ -278,7 +278,7 @@ way, option `send_timeout` comes in handy.
         {mode,            list | binary} | list | binary |
         {nodelay,         boolean()} |
         {packet,
-         0 | 1 | 2 | 4 | raw | sunrm |  asn1 |
+         0 | 1 | 2 | {2, little} | 4 | {4, little} | raw | sunrm |  asn1 |
          cdr | fcgi | line | tpkt | http | httph | http_bin | httph_bin } |
         {packet_size,     non_neg_integer()} |
         {priority,        non_neg_integer()} |

@@ -1504,8 +1504,23 @@ BIF_RETTYPE decode_packet_3(BIF_ALIST_3)
     case am_httph_bin: type = TCP_PB_HTTPH_BIN; break;
     case am_ssl_tls: type = TCP_PB_SSL_TLS; break;
     default:
-        BIF_P->fvalue = am_badopt;
-        BIF_ERROR(BIF_P, BADARG | EXF_HAS_EXT_INFO);
+        if (is_tuple(BIF_ARG_1)) {
+            Eterm *tpl = tuple_val(BIF_ARG_1);
+            if (tpl[0] == make_arityval(2) &&
+                (tpl[1] == make_small(2) || tpl[1] == make_small(4)) &&
+                tpl[2] == am_little) {
+                switch (tpl[1]) {
+                case make_small(2): type=TCP_PB_2_LITTLE; break;
+                case make_small(4): type=TCP_PB_4_LITTLE; break;
+                }
+            } else {
+                BIF_P->fvalue = am_badopt;
+                BIF_ERROR(BIF_P, BADARG | EXF_HAS_EXT_INFO);
+            }
+        } else {
+            BIF_P->fvalue = am_badopt;
+            BIF_ERROR(BIF_P, BADARG | EXF_HAS_EXT_INFO);
+        }
     }
 
     if (!is_bitstring(BIF_ARG_2) ||

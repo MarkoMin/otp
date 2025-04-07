@@ -1726,7 +1726,9 @@ type_opt_1(packet) ->
     {enum,[{0, ?TCP_PB_RAW},
 	   {1, ?TCP_PB_1},
 	   {2, ?TCP_PB_2},
+           {{2, little}, ?TCP_PB_2_LITTLE},
 	   {4, ?TCP_PB_4},
+           {{4, little}, ?TCP_PB_4_LITTLE},
 	   {raw,?TCP_PB_RAW},
 	   {sunrm, ?TCP_PB_RM},
 	   {asn1, ?TCP_PB_ASN1},
@@ -1737,9 +1739,7 @@ type_opt_1(packet) ->
 	   {http, ?TCP_PB_HTTP},
 	   {httph,?TCP_PB_HTTPH},
 	   {http_bin, ?TCP_PB_HTTP_BIN},
-	   {httph_bin,?TCP_PB_HTTPH_BIN},
-	   {ssl, ?TCP_PB_SSL_TLS}, % obsolete
-	   {ssl_tls, ?TCP_PB_SSL_TLS}]};
+	   {httph_bin,?TCP_PB_HTTPH_BIN}]};
 type_opt_1(line_delimiter)  -> int;
 type_opt_1(mode) ->
     {enum,[{list, ?INET_MODE_LIST},
@@ -1910,6 +1910,8 @@ type_value_1(Q, {record,Types}, undefined) ->
 type_value_1(Q, {record,Types}, Values)
   when tuple_size(Types) =:= tuple_size(Values) ->
     type_value_record(Q, Types, Values, 2);
+type_value_1(_, {enum,_}=Type, Value) ->
+    type_value_2(Type, Value);
 type_value_1(Q, Types, Values)
   when tuple_size(Types) =:= tuple_size(Values) ->
     type_value_tuple(Q, Types, Values, 1);
@@ -2112,6 +2114,8 @@ enc_value_1(Q, {record,Types}, undefined) ->
 enc_value_1(Q, {record,Types}, Values)
   when tuple_size(Types) =:= tuple_size(Values) ->
     enc_value_tuple(Q, Types, Values, 2);
+enc_value_1(_, {enum,_}=Type, Value) ->
+    enc_value_2(Type, Value);
 enc_value_1(Q, Types, Values) when tuple_size(Types) =:= tuple_size(Values) ->
     enc_value_tuple(Q, Types, Values, 1);
 enc_value_1(_, Type, Value) ->

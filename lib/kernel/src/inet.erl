@@ -1254,6 +1254,9 @@ The following options are available:
 
     The 4-byte header is limited to 2Gb.
 
+  - **`{2 | 4, little}` - Equal to `2` or `4` respectively, but header
+    length is in **little-endian** byte order.
+
   - **`asn1 | cdr | sunrm | fcgi | tpkt | line`** - These packet types only have
     effect on receiving. When sending a packet, it is the responsibility of the
     application to supply a correct header. On receiving, however, one message
@@ -4290,8 +4293,10 @@ info({'$inet', GenSocketMod, _} = S, F, Proto) when is_atom(GenSocketMod) ->
 		_ -> " "
 	    end;
 	packet ->
-	    case GenSocketMod:which_packet_type(S) of
-		{ok, Type} -> atom_to_list(Type);
+            case GenSocketMod:which_packet_type(S) of
+		{ok,Type} when is_atom(Type) -> atom_to_list(Type);
+		{ok,Type} when is_integer(Type) -> integer_to_list(Type);
+                {ok,{Size,little}} when is_integer(Size) -> integer_to_list(Size) ++ " little";
 		_ -> " "
 	    end;
 	type ->
@@ -4347,6 +4352,7 @@ info(S, F, Proto) ->
 	    case prim_inet:getopt(S, packet) of
 		{ok,Type} when is_atom(Type) -> atom_to_list(Type);
 		{ok,Type} when is_integer(Type) -> integer_to_list(Type);
+                {ok,{Size,little}} when is_integer(Size) -> integer_to_list(Size) ++ " little";
 		_ -> " "
 	    end;
 	type ->

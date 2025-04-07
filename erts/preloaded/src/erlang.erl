@@ -1759,10 +1759,16 @@ returned.
 - **`raw | 0`** - No packet handling is done. The entire binary is returned
   unless it is empty.
 
-- **`1 | 2 | 4`** - Packets consist of a header specifying the number of bytes
-  in the packet, followed by that number of bytes. The length of the header can
-  be one, two, or four bytes; the order of the bytes is big-endian. The header
-  is stripped off when the packet is returned.
+- **`1 | 2 | 4`** - Packets consist of a header specifying the number of bytes
+  in the packet, followed by that number of bytes. The header length can be
+  one, two, or four bytes, and containing an unsigned integer in big-endian
+  byte order. Each send operation generates the header, and the header is
+  stripped off on each receive operation.
+
+  The 4-byte header is limited to 2Gb.
+
+- **`{2 | 4, little}` - Equal to `2` or `4` respectively, but header
+  length is in **little-endian** byte order.
 
 - **`line`** - A packet is a line-terminated by a delimiter byte, default is the
   latin-1 newline character. The delimiter byte is included in the returned
@@ -1828,6 +1834,10 @@ Options:
 {ok,<<"abc">>,<<"d">>}
 2> erlang:decode_packet(1, <<5,"abcd">>, []).
 {more,6}
+3> erlang:decode_packet(2, <<1,0,"abcd">>, []).
+{more,258}
+4> erlang:decode_packet({2, little}, <<1,0,"abcd">>, []).
+{ok,<<"a">>,<<"bcd">>}
 ```
 """.
 -doc #{ category => terms }.
@@ -1835,8 +1845,9 @@ Options:
                                   {ok, Packet, Rest} |
                                   {more, Length} |
                                   {error, Reason} when
-      Type :: 'raw' | 0 | 1 | 2 | 4 | 'asn1' | 'cdr' | 'sunrm' | 'fcgi'
-            | 'tpkt' | 'line' | 'http' | 'http_bin' | 'httph' | 'httph_bin',
+      Type :: 'raw' | 0 | 1 | 2 | {2, little} | 4 | {4, little} | 'asn1'
+            | 'cdr' | 'sunrm' | 'fcgi' | 'tpkt' | 'line' | 'http' | 'http_bin'
+            | 'httph' | 'httph_bin',
       Bin :: binary(),
       Options :: [Opt],
       Opt :: {packet_size, non_neg_integer()}
