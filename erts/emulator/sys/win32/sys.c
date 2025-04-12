@@ -505,6 +505,7 @@ struct driver_data {
     int packet_bytes;		/* 0: continuous stream, 1, 2, or 4: the number
 				 * of bytes in the packet header.
 				 */
+    int packet_endian;          /* mmin - TODO */
     HANDLE port_pid;		/* PID of the port process. */
     AsyncIo in;			/* Control block for overlapped reading. */
     AsyncIo out;		/* Control block for overlapped writing. */
@@ -619,7 +620,8 @@ unrefer_driver_data(DriverData *dp)
  */
 
 static DriverData*
-new_driver_data(ErlDrvPort port_num, int packet_bytes, int wait_objs_required, int use_threads)
+new_driver_data(ErlDrvPort port_num, int packet_bytes, int packet_endian,
+                int wait_objs_required, int use_threads)
 {
     DriverData* dp;
 
@@ -646,6 +648,7 @@ new_driver_data(ErlDrvPort port_num, int packet_bytes, int wait_objs_required, i
     dp->outbuf = NULL;
     dp->port_num = port_num;
     dp->packet_bytes = packet_bytes;
+    dp->packet_endian = packet_endian;
     dp->port_pid = INVALID_HANDLE_VALUE;
     if (init_async_io(dp, &dp->in, use_threads) == -1)
 	goto async_io_error1;
@@ -1189,8 +1192,8 @@ spawn_start(ErlDrvPort port_num, char* utf8_name, SysDriverOpts* opts)
     if (opts->read_write & DO_WRITE)
 	neededSelects++;
 
-    if ((dp = new_driver_data(port_num, opts->packet_bytes, neededSelects,
-			      !use_named_pipes)) == NULL)
+    if ((dp = new_driver_data(port_num, opts->packet_bytes, opts->packet_endian,
+                              neededSelects, !use_named_pipes)) == NULL)
 	return ERL_DRV_ERROR_GENERAL;
 
     /*
@@ -2133,7 +2136,7 @@ fd_start(ErlDrvPort port_num, char* name, SysDriverOpts* opts)
 	dp = save_22_port;
 	return reuse_driver_data(dp, (HANDLE) opts->ifd, (HANDLE) opts->ofd, opts->read_write, port_num);
     } else {
-	if ((dp = new_driver_data(port_num, opts->packet_bytes, 2, TRUE)) == NULL)
+	if ((dp = new_driver_data(port_num, opts->packet_bytes, opts->packet_endian, 2, TRUE)) == NULL)
 	    return ERL_DRV_ERROR_GENERAL;
 	
 	/**
@@ -2428,15 +2431,30 @@ output(ErlDrvData drv_data, char* buf, ErlDrvSizeT len)
      */
 
     current = bin->orig_bytes;
-
-    switch (pb) {
-    case 4:
-	*current++ = (len >> 24) & 255;
-	*current++ = (len >> 16) & 255;
-    case 2:
-	*current++ = (len >> 8) & 255;
-    case 1:
-	*current++ = len & 255;
+    
+    switch (drv_data->packet_endian){
+        case 0: { /* big endian */
+            switch (pb) {
+            case 4:
+                *current++ = (len >> 24) & 255;
+                *current++ = (len >> 16) & 255;
+            case 2:
+                *current++ = (len >> 8) & 255;
+            case 1:
+                *current++ = len & 255;
+            }
+        }
+        case 1:
+        case 2: { /* little/native endian (Windows are always little endian) */
+            switch (pb) {
+            case 4:
+                put_int32_little((Uint32) len, current);
+                break;
+            case 2:
+                put_int16_little((Uint16) len, current);
+                break;
+            }
+        }
     }
 
     /*
@@ -2589,15 +2607,29 @@ ready_input(ErlDrvData drv_data, ErlDrvEvent ready_event)
 		    int packet_size = 0;
 		    unsigned char *header = (unsigned char *) dp->inbuf;
 		    
-		    switch (pb) {
-		    case 4:
-			packet_size = (packet_size << 8) | *header++;
-			packet_size = (packet_size << 8) | *header++;
-		    case 2:
-			packet_size = (packet_size << 8) | *header++;
-		    case 1:
-			packet_size = (packet_size << 8) | *header++;
-		    }
+                    switch (dp->packet_endian) {
+                        case 0: {/* big endian */
+                            switch (pb) {
+                            case 4:
+                                packet_size = (packet_size << 8) | *header++;
+                                packet_size = (packet_size << 8) | *header++;
+                            case 2:
+                                packet_size = (packet_size << 8) | *header++;
+                            case 1:
+                                packet_size = (packet_size << 8) | *header++;
+                            }
+                        }
+                        case 1: { /* little/native endian (Windows are always little endian) */
+                            switch (pb) {
+                            case 4:
+                                packet_size = get_int32_little(header);
+                                break;
+                            case 2:
+                                packet_size = get_int16_little(header);
+                                break;
+                            }
+                        }
+                    }
 		    
 		    dp->totalNeeded += packet_size;
 		    

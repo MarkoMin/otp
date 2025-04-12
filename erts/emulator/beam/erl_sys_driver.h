@@ -46,6 +46,7 @@ struct _SysDriverOpts {
     Uint ifd;			/* Input file descriptor (fd driver). */
     Uint ofd;			/* Outputfile descriptor (fd driver). */
     int packet_bytes;		/* Number of bytes in packet header. */
+    int packet_endian;          /* mmin - TODO */
     int read_write;		/* Read and write bits. */
     int use_stdio;		/* Use standard I/O: TRUE or FALSE. */
     int redir_stderr;           /* Redirect stderr to stdout: TRUE/FALSE. */

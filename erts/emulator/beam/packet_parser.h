@@ -27,7 +27,6 @@
 #include <erl_driver.h>
 #include "sys.h"
 
-
 /* INET_LOPT_PACKET options */
 enum PacketParseType {
     TCP_PB_RAW      = 0,
@@ -46,7 +45,9 @@ enum PacketParseType {
     TCP_PB_HTTP_BIN = 13,
     TCP_PB_HTTPH_BIN = 14,
     TCP_PB_2_LITTLE = 15,
-    TCP_PB_4_LITTLE = 16
+    TCP_PB_2_NATIVE = 16,
+    TCP_PB_4_LITTLE = 17,
+    TCP_PB_4_NATIVE = 18
 };
 
 typedef struct http_atom {
@@ -146,6 +147,7 @@ struct fcgi_head {
 int packet_parse_http(const char*, int, int*, PacketCallbacks*, void*);
 int packet_parse_ssl(const char*, int, PacketCallbacks*, void*);
 
+/* mmin - TODO  GH issues #7265, #797 #3672 */
 
 #if ERTS_GLB_INLINE_INCL_FUNC_DEF
 ERTS_GLB_INLINE
@@ -153,8 +155,14 @@ void packet_get_body(enum PacketParseType htype, const char** bufp, int* lenp)
 {
     switch (htype) {
     case TCP_PB_1: *bufp += 1; *lenp -= 1; break;
-    case TCP_PB_2: case TCP_PB_2_LITTLE: *bufp += 2; *lenp -= 2; break;
-    case TCP_PB_4: case TCP_PB_4_LITTLE: *bufp += 4; *lenp -= 4; break;
+    case TCP_PB_2:
+    case TCP_PB_2_LITTLE:
+    case TCP_PB_2_NATIVE:
+        *bufp += 2; *lenp -= 2; break;
+    case TCP_PB_4:
+    case TCP_PB_4_LITTLE:
+    case TCP_PB_4_NATIVE:
+        *bufp += 4; *lenp -= 4; break;
     case TCP_PB_FCGI:
 	*lenp -= ((struct fcgi_head*)*bufp)->paddingLength;
         break;

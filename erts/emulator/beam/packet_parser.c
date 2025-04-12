@@ -278,7 +278,17 @@ int packet_get_length(enum PacketParseType htype,
         /* TCP_PB_2_LITTLE:    [L0,L1 | Data] */
         hlen = 2;
         if (n < hlen) goto more;
-        plen = get_little_int16(ptr);
+        plen = get_int16_little(ptr);
+        goto remain;
+
+    case TCP_PB_2_NATIVE:
+        /* TCP_PB_2_NATIVE:  [L0,L1 | Data] */
+        /* L0, L1 - in native endian for this machine */
+        hlen = 2;
+        if (n < hlen) goto more;
+        uint16_t tmp_len;
+        memcpy(&tmp_len,ptr,2);
+        plen=tmp_len;
         goto remain;
 
     case TCP_PB_4:
@@ -292,7 +302,17 @@ int packet_get_length(enum PacketParseType htype,
         /* TCP_PB_4_LITTLE:    [L0,L1,L2,L4 | Data] */
         hlen = 4;
         if (n < hlen) goto more;
-        plen = get_little_int32(ptr);
+        plen = get_int32_little(ptr);
+        goto remain;
+
+    case TCP_PB_4_NATIVE:
+        /* TCP_PB_4_NATIVE:  [L0,L1,L2,L3 | Data] */
+        /* L0, L1, L2, L3 - in native endian for this machine */
+        hlen = 4;
+        if (n < hlen) goto more;
+        uint32_t tmp_len;
+        memcpy(&tmp_len,ptr,4);
+        plen=tmp_len;
         goto remain;
 
     case TCP_PB_RM:
@@ -382,7 +402,7 @@ int packet_get_length(enum PacketParseType htype,
         if (sys_memcmp(hp->magic, CDR_MAGIC, 4) != 0)
             goto error;
         if (hp->flags & 0x01) /* Byte ordering flag */
-            plen = get_little_int32(hp->message_size);
+            plen = get_int32_little(hp->message_size);
         else
             plen = get_int32(hp->message_size);
         goto remain;

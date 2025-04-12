@@ -12643,10 +12643,14 @@ static int packet_header_length(tcp_descriptor *desc) {
      * Set hlen to the minimal header bytes, for starters.
      */
     case TCP_PB_1:          hlen = 1; break;
-    case TCP_PB_2:          hlen = 2; break;
-    case TCP_PB_2_LITTLE:   hlen = 2; break;
-    case TCP_PB_4:          hlen = 4; break;
-    case TCP_PB_4_LITTLE:   hlen = 4; break;
+    case TCP_PB_2:
+    case TCP_PB_2_LITTLE:
+    case TCP_PB_2_NATIVE:
+         hlen = 2; break;
+    case TCP_PB_4:
+    case TCP_PB_4_LITTLE:
+    case TCP_PB_4_NATIVE:
+         hlen = 4; break;
     case TCP_PB_RM:         hlen = 4; break;
     case TCP_PB_ASN1:       hlen = 2; break;
     case TCP_PB_SSL_TLS:    hlen = 5; break;
@@ -13491,6 +13495,12 @@ static int tcp_sendv(tcp_descriptor* desc, ErlIOVec* ev)
          put_little_int16(len, buf);
          h_len = 2;
          break;
+     case TCP_PB_2_NATIVE: {
+         unit16_t tmp=len,
+         memcpy(buf, &tmp, 2),
+         h_len = 2;
+         break;
+     }
      case TCP_PB_4:
          put_int32(len, buf);
          h_len = 4;
@@ -13499,6 +13509,12 @@ static int tcp_sendv(tcp_descriptor* desc, ErlIOVec* ev)
          put_little_int32(len, buf);
          h_len = 4;
          break;
+     case TCP_PB_4_NATIVE: {
+         unit32_t tmp=len,
+         memcpy(buf, &tmp, 4),
+         h_len = 4;
+         break;
+     }
      default:
          h_len = 0;
          break;
@@ -13607,22 +13623,32 @@ static int tcp_send(tcp_descriptor* desc, char* ptr, ErlDrvSizeT len)
 	put_int8(len, buf);
 	h_len = 1;
 	break;
-    case TCP_PB_2: 
-	put_int16(len, buf);
-	h_len = 2; 
-	break;
+    case TCP_PB_2:
+        put_int16(len, buf);
+        h_len = 2;
+        break;
     case TCP_PB_2_LITTLE:
-	put_little_int16(len, buf);
-	h_len = 2;
-	break;
-    case TCP_PB_4: 
-	put_int32(len, buf);
-	h_len = 4; 
-	break;
+        put_little_int16(len, buf);
+        h_len = 2;
+        break;
+    case TCP_PB_2_NATIVE:
+        unit16_t tmp=len,
+        memcpy(buf, &tmp, 2),
+        h_len = 2;
+        break;
+    case TCP_PB_4:
+        put_int32(len, buf);
+        h_len = 4;
+        break;
     case TCP_PB_4_LITTLE:
-	put_little_int32(len, buf);
-	h_len = 4;
-	break;
+        put_little_int32(len, buf);
+        h_len = 4;
+        break;
+    case TCP_PB_4_NATIVE:
+        unit32_t tmp=len,
+        memcpy(buf, &tmp, 4),
+        h_len = 4;
+        break;
     default:
 	h_len = 0;
 	break;

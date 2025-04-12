@@ -259,6 +259,8 @@ way, option `send_timeout` comes in handy.
 -define(module_socket(Handler, Handle),
         {'$inet', (Handler), (Handle)}).
 
+-type packet_header_endian() :: big | little | native.
+
 -type option() ::
         {active,          true | false | once | -32768..32767} |
         {buffer,          non_neg_integer()} |
@@ -278,7 +280,7 @@ way, option `send_timeout` comes in handy.
         {mode,            list | binary} | list | binary |
         {nodelay,         boolean()} |
         {packet,
-         0 | 1 | 2 | {2, little} | 4 | {4, little} | raw | sunrm |  asn1 |
+         0 | 1 | 2 | 4 | {2 | 4, packet_header_endian()} | raw | sunrm |  asn1 |
          cdr | fcgi | line | tpkt | http | httph | http_bin | httph_bin } |
         {packet_size,     non_neg_integer()} |
         {priority,        non_neg_integer()} |
@@ -393,7 +395,7 @@ As returned by [`accept/1,2`](`accept/1`) and [`connect/3,4`](`connect/3`).
 -type socket() :: inet:socket().
 
 -export_type([option/0, option_name/0, connect_option/0, listen_option/0,
-              socket/0, pktoptions_value/0]).
+              socket/0, pktoptions_value/0, packet_header_endian/0]).
 
 
 %% -define(DBG(T), erlang:display({{self(), ?MODULE, ?LINE, ?FUNCTION_NAME}, T})).

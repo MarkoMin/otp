@@ -809,6 +809,7 @@ open_port(Process* p, Eterm name, Eterm settings, int *err_typep, int *err_nump)
 
     /* These are the defaults */
     opts.packet_bytes = 0;
+    opts.packet_endian = 
     opts.use_stdio = 1;
     opts.redir_stderr = 0;
     opts.read_write = 0;
@@ -1503,17 +1504,35 @@ BIF_RETTYPE decode_packet_3(BIF_ALIST_3)
     case am_http_bin: type = TCP_PB_HTTP_BIN; break;
     case am_httph_bin: type = TCP_PB_HTTPH_BIN; break;
     case am_ssl_tls: type = TCP_PB_SSL_TLS; break;
-    default:
-        if (is_tuple(BIF_ARG_1)) {
-            Eterm *tpl = tuple_val(BIF_ARG_1);
-            if (tpl[0] == make_arityval(2) &&
-                (tpl[1] == make_small(2) || tpl[1] == make_small(4)) &&
-                tpl[2] == am_little) {
-                switch (tpl[1]) {
-                case make_small(2): type=TCP_PB_2_LITTLE; break;
-                case make_small(4): type=TCP_PB_4_LITTLE; break;
+    default: {
+        Eterm *tpl = tuple_val(BIF_ARG_1);
+        if (is_tuple(BIG_ARG_1) && *(tpl = tuple_val(BIF_ARG_1)) == make_arityval(2)) {
+            /* Ensure packet bytes is either 2 or 4 */
+            if (tpl[1] != make_small(2) && tpl[1] != make_small(4)) {
+                BIF_P->fvalue = am_badopt;
+                BIF_ERROR(BIF_P, BADARG | EXF_HAS_EXT_INFO);
+            }
+
+            switch (tpl[2]): {
+            case am_big: {
+                switch(tpl[1]): {
+                case make_small(2): type = TCP_PB_2; break;
+                case make_small(4): type = TCP_PB_4; break;
                 }
-            } else {
+            }
+            case am_little: {
+                switch(tpl[1]): {
+                case make_small(2): type = TCP_PB_2_LITTLE; break;
+                case make_small(4): type = TCP_PB_4_LITTLE; break;
+                }
+            }
+            case am_native: {
+                switch(tpl[1]): {
+                case make_small(2): type = TCP_PB_2_NATIVE; break;
+                case make_small(4): type = TCP_PB_4_NATIVE; break;
+                }
+            }
+            default:
                 BIF_P->fvalue = am_badopt;
                 BIF_ERROR(BIF_P, BADARG | EXF_HAS_EXT_INFO);
             }
@@ -1521,6 +1540,7 @@ BIF_RETTYPE decode_packet_3(BIF_ALIST_3)
             BIF_P->fvalue = am_badopt;
             BIF_ERROR(BIF_P, BADARG | EXF_HAS_EXT_INFO);
         }
+    }
     }
 
     if (!is_bitstring(BIF_ARG_2) ||

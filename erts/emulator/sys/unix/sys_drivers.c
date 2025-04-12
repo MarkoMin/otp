@@ -108,6 +108,7 @@ typedef struct driver_data {
     ErtsSysFdData *ofd;
     ErtsSysFdData *ifd;
     int packet_bytes;
+    int packet_endian;
     int pid;
     int alive;
     int status;
@@ -335,6 +336,7 @@ create_driver_data(ErlDrvPort port_num,
                    int ifd,
                    int ofd,
                    int packet_bytes,
+                   int packet_endian,
                    int read_write,
                    int exit_status,
                    int pid,
@@ -364,6 +366,7 @@ create_driver_data(ErlDrvPort port_num,
 	prt->os_pid = pid;
 
     driver_data->packet_bytes = packet_bytes;
+    driver_data->packet_endian = packet_endian;
     driver_data->port_num = port_num;
     driver_data->pid = pid;
     driver_data->alive = exit_status ? 1 : 0;
@@ -690,7 +693,7 @@ static ErlDrvData spawn_start(ErlDrvPort port_num, char* name,
     erts_free(ERTS_ALC_T_TMP, (void *) cmd_line);
 
     dd = create_driver_data(port_num, ifd[0], ofd[1], opts->packet_bytes,
-                             DO_WRITE | DO_READ, opts->exit_status,
+                            opts->packet_endian, DO_WRITE | DO_READ, opts->exit_status,
                             0, 0, opts);
 
     {
@@ -970,6 +973,7 @@ static ErlDrvData fd_start(ErlDrvPort port_num, char* name,
     }
     return (ErlDrvData)create_driver_data(port_num, opts->ifd, opts->ofd,
                                           opts->packet_bytes,
+                                          opts->packet_endian,
                                           opts->read_write, 0, -1,
                                           !non_blocking, opts);
 }
@@ -1068,9 +1072,35 @@ static void outputv(ErlDrvData e, ErlIOVec* ev)
 	driver_failure_posix(ix, EINVAL);
 	return; /* -1; */
     }
-    /* Handles 0 <= pb <= 4 only */
-    put_int32((Uint32) len, lb);
-    lbp = lb + (4-pb);
+
+    switch (dd->packet_endian){
+    case 0: /* big endian */
+        /* Handles 0 <= pb <= 4 only */
+        put_int32((Uint32) len, lb);
+        lbp = lb + (4-pb);
+    case 1: /* little endian */
+        put_int32_little((Uint32) len, lb);
+	lbp = lb;
+    case 2: { /* native endian */
+        if (pb > 4 || pb < 2) { /* Avoid memory corruption in memcpy */
+            driver_failure_posix(ix, EINVAL);
+            return; /* -1; */
+        }
+        switch (pb) {
+        case 2: {
+            uint16_t tmp_len = len;
+            memcpy(lb,&tmp_len,2);
+            break;
+        }
+        case 4: {
+            uint32_t tmp_len = len;
+            memcpy(lb,&tmp_len,4);
+            break;
+        }
+        }
+        lbp = lb;
+        }
+    }
 
     ev->iov[0].iov_base = lbp;
     ev->iov[0].iov_len = pb;
@@ -1151,8 +1181,35 @@ static void output(ErlDrvData e, char* buf, ErlDrvSizeT len)
 	driver_failure_posix(ix, EINVAL);
 	return; /* -1; */
     }
-    put_int32(len, lb);
-    lbp = lb + (4-pb);
+    
+    switch (dd->packet_endian){
+    case 0: /* big endian */
+        /* Handles 0 <= pb <= 4 only */
+        put_int32((Uint32) len, lb);
+        lbp = lb + (4-pb);
+    case 1: /* little endian */
+        put_int32_little((Uint32) len, lb);
+	lbp = lb;
+    case 2: { /* native endian */
+        if (pb > 4 || pb < 2) { /* Avoid memory corruption in memcpy */
+            driver_failure_posix(ix, EINVAL);
+            return; /* -1; */
+        }
+        switch (pb) {
+        case 2: {
+            uint16_t tmp_len = len;
+            memcpy(lb,&tmp_len,2);
+            break;
+        }
+        case 4: {
+            uint32_t tmp_len = len;
+            memcpy(lb,&tmp_len,4);
+            break;
+        }
+        }
+        lbp = lb;
+        }
+    }
 
     qsz = driver_sizeq(ix);
     if (qsz) {
@@ -1400,13 +1457,39 @@ static void ready_input(ErlDrvData e, ErlDrvEvent ready_fd)
 		    break;
 		}
 		dd->ifd->psz = 0;
-
-		switch (packet_bytes) {
-		case 1: h = get_int8(dd->ifd->pbuf);  break;
-		case 2: h = get_int16(dd->ifd->pbuf); break;
-		case 4: h = get_uint32(dd->ifd->pbuf); break;
-		default: ASSERT(0); return; /* -1; */
-		}
+                
+                switch (packet_endian) {
+                case 0: { /* big endian */
+                    switch (packet_bytes) {
+                    case 1: h = get_int8(dd->ifd->pbuf);  break;
+                    case 2: h = get_int16(dd->ifd->pbuf); break;
+                    case 4: h = get_int32(dd->ifd->pbuf); break;
+                    default: ASSERT(0); return; /* -1; */
+                    }
+                }
+                case 1: { /* little endian */
+                    switch (packet_bytes) {
+                    case 2: h = get_int16_little(dd->ifd->pbuf); break;
+                    case 4: h = get_int32_little(dd->ifd->pbuf); break;
+                    }
+                }
+                case 2: { /* native endian */
+                    switch (packet_bytes) {
+                    case 2: {
+                        uint16_t tmp_len;
+                        memcpy(&tmp_len, dd->ifd->pbuf, 2),
+                        h = tmp_len;
+                        break;
+                    }
+                    case 4: {
+                        uint32_t tmp_len;
+                        memcpy(&tmp_len, dd->ifd->pbuf, 4),
+                        h = tmp_len;
+                        break;
+                    }
+                    }
+                }
+                }
 
 		if (h <= (bytes_left)) {
 		    driver_output(port_num, (char*) cpos, h);

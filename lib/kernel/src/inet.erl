@@ -1254,6 +1254,7 @@ The following options are available:
 
     The 4-byte header is limited to 2Gb.
 
+mmin - TODO
   - **`{2 | 4, little}` - Equal to `2` or `4` respectively, but header
     length is in **little-endian** byte order.
 

@@ -1767,6 +1767,7 @@ returned.
 
   The 4-byte header is limited to 2Gb.
 
+mmin - TODO
 - **`{2 | 4, little}` - Equal to `2` or `4` respectively, but header
   length is in **little-endian** byte order.
 
@@ -7799,6 +7800,7 @@ by passing command-line flag [`+Q`](erl_cmd.md#max_ports) to [erl](erl_cmd.md).
                   {spawn_executable, FileName :: file:name_all() } |
                   {fd, In :: non_neg_integer(), Out :: non_neg_integer()},
       PortSettings :: [Opt],
+      %% mmin - TODO
       Opt :: {packet, N :: 1 | 2 | 4}
            | stream
            | {line, L :: non_neg_integer()}
